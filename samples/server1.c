@@ -62,6 +62,7 @@ main()
 
   ham_db_close(db, 0);
 
+  /* and a third... */
   st = ham_env_create_db(env, &db, 33,
         HAM_RECORD_NUMBER | HAM_ENABLE_DUPLICATES, 0);
   if (st) {

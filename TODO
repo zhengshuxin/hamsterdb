@@ -292,6 +292,23 @@ o remote code crashes on win32
     o test the new sample in topic/remote on win32
     o send the new libraries to Phillip
 
+o neues test-programm machen mit 15 simultaneous clients, selbe db
+    x basierend auf client1.c
+    x assert weil socket nicht geschlossen wurde
+    x client hat "duplicate key" - warum?
+    o server crasht mit assert, wenn eine db "close" macht und eine andere
+        dann einen "find" -> benötigt reference counter? oder den close einfach
+        nicht durchführen?
+    o env_flush wird oft aufgerufen - warum??
+    o auf cursor-API umschreiben
+    o unter windows testen
+
+. java-test fails on a slower machine (race cond. in finalize()?)
+    -> this is just a test issue
+
+. run a performance test clang++ vs g++
+>>>>>>> Trying to track down Phillip's issue
+
 ------------------- release 2.1.2 -----------------------------------------
 
 
