@@ -304,8 +304,9 @@ o neues test-programm machen mit 15 simultaneous clients, selbe db
         -> fails w/ KEY_NOT_FOUND; seems to be a server-side issue?
     x frequently open/reopen the cursor
     x remove instrumentation in hamserver.cc
+    x store the new test (in the unittests-directory?)
+    x do NOT commit the modified client1.c file!
     o run tests on windows
-    o store the new test (in the unittests-directory?)
     o the following messages do not need to send a full record in their
         request: DbFind(Record), CursorFind(Record), CursorMove(key, record)
         -> not true: need to transfer partial_offset, partial_size. But
@@ -375,6 +376,15 @@ o rewrite configure.in; look at libuv for a good sample
     o test on MacOS (tcmalloc must be disabled!)
 
 o remove libjson, use boost::property_tree instead!
+
+o btree_erase.cc:72 - if coupled_index > 0 oder >= 0?
+o btree_erase.cc:75 - wenn direkt remove_entry aufgerufen wird dann wird
+    der gelöschte key nochmal uncouple()d obwohl das unnötig ist
+
+o reimplement BtreeCursor::points_to (when extended keys are re-implemented)
+
+o remote communication: there should be a configuration setting for
+    client-side timeouts
 
 . review/rewrite/refactor Transaction class
     keep in mind that sooner or later the BtreeNode will expect template
