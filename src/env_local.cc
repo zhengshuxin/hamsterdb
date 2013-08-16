@@ -147,10 +147,13 @@ LocalEnvironment::create(const char *filename, ham_u32_t flags,
 
   /* flush the header page - this will write through disk if logging is
    * enabled */
-  if (get_flags() & HAM_ENABLE_RECOVERY)
-    return (m_page_manager->flush_page(m_header->get_header_page()));
+  if (get_flags() & HAM_ENABLE_RECOVERY) {
+    st = m_page_manager->flush_page(m_header->get_header_page());
+    if (st)
+      return (st);
+  }
 
-  return (0);
+  return (flush(0));
 }
 
 ham_status_t
@@ -719,7 +722,7 @@ LocalEnvironment::create_db(Database **pdb, ham_u16_t dbname,
 
   *pdb = db;
   
-  return (0);
+  return (flush(0));
 }
 
 ham_status_t

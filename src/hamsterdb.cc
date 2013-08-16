@@ -485,12 +485,6 @@ ham_env_create(ham_env_t **henv, const char *filename,
   /* and finish the initialization of the Environment */
   ham_status_t st = env->create(filename, flags, mode, pagesize, cachesize,
           maxdbs);
-  if (st)
-    goto bail;
-
-  /* flush the environment to make sure that the header page is written
-   * to disk */
-  st = env->flush(0);
 
 bail:
   if (st) {
@@ -530,12 +524,6 @@ ham_env_create_db(ham_env_t *henv, ham_db_t **hdb, ham_u16_t dbname,
 
   /* the function handler will do the rest */
   st = env->create_db((Database **)hdb, dbname, flags, param);
-  if (st)
-    goto bail;
-
-  /* flush the environment to make sure that the header page is written
-   * to disk */
-  st = env->flush(0);
 
 bail:
   if (st) {

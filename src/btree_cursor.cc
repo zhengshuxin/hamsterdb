@@ -269,15 +269,25 @@ BtreeCursor::erase(ham_u32_t flags)
   if (m_state != kStateUncoupled && m_state != kStateCoupled)
     return (HAM_CURSOR_IS_NIL);
 
+  if (m_state == kStateCoupled) {
+    PBtreeNode *node = PBtreeNode::from_page(m_coupled_page);
+    PBtreeKey *entry = node->get_key(m_parent->get_db(), m_coupled_index);
+  }
+
   return (be->erase(txn, m_parent, 0, 0, flags));
 }
 
 bool
 BtreeCursor::points_to(PBtreeKey *key)
 {
+  // TODO instead of coupling, it would be better to just call the compare 
+  // function of the two buffers
   ham_status_t st;
+  bool was_uncoupled = false;
+  bool ret = false;
 
   if (m_state == kStateUncoupled) {
+    was_uncoupled = true;
     st = couple();
     if (st)
       return (false);
@@ -288,10 +298,16 @@ BtreeCursor::points_to(PBtreeKey *key)
     PBtreeKey *entry = node->get_key(m_parent->get_db(), m_coupled_index);
 
     if (entry == key)
-      return (true);
+      ret = true;
   }
 
-  return (false);
+  // if it was uncoupled then most likely for a reason; better uncouple
+  // the cursor again
+  // TODO rewrite this when extended keys are gone (see comment above)
+  if (was_uncoupled)
+    uncouple_from_page();
+
+  return (ret);
 }
 
 bool
@@ -771,6 +787,7 @@ BtreeCursor::uncouple_all_cursors(Page *page, ham_size_t start)
     }
 
     cursors = next ? next->m_parent : 0;
+    ham_assert(btc != next);
   }
 
   if (!skipped)

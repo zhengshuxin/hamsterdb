@@ -37,7 +37,7 @@ main()
 
   /* create a new Environment; this Environment will be attached to the
    * server */
-  st = ham_env_create(&env, "env1.db", HAM_ENABLE_TRANSACTIONS, 0644, 0);
+  st = ham_env_create(&env, "env1.db", 0, 0644, 0);
   if (st) {
     printf("ham_env_create: %d\n", st);
     exit(-1);

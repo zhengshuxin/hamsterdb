@@ -296,12 +296,66 @@ o neues test-programm machen mit 15 simultaneous clients, selbe db
     x basierend auf client1.c
     x assert weil socket nicht geschlossen wurde
     x client hat "duplicate key" - warum?
-    o server crasht mit assert, wenn eine db "close" macht und eine andere
+    x server crasht mit assert, wenn eine db "close" macht und eine andere
         dann einen "find" -> benötigt reference counter? oder den close einfach
         nicht durchführen?
-    o env_flush wird oft aufgerufen - warum??
-    o auf cursor-API umschreiben
-    o unter windows testen
+    x env_flush wird oft aufgerufen - warum??
+    x use cursor-API instead of regular API
+        -> fails w/ KEY_NOT_FOUND; seems to be a server-side issue?
+    x frequently open/reopen the cursor
+    x remove instrumentation in hamserver.cc
+    o run tests on windows
+    o store the new test (in the unittests-directory?)
+    o the following messages do not need to send a full record in their
+        request: DbFind(Record), CursorFind(Record), CursorMove(key, record)
+        -> not true: need to transfer partial_offset, partial_size. But
+            the record data is not required
+
+o remote communication: should there be a configuration setting for
+    client-side timeouts?
+
+Gedanken zum Business Model
+- Mongoose: so viel zugang weil es keine GPL ist! Eine mögliche Idee wäre:
+  Projekt splitten in
+      - kommerziellen closed source-anteil:
+            - concurrency
+            - server
+            - consulting (neue features, hilfe bei integration, review der
+                    implementation, portieren auf andere plattformen etc)
+            - trainings-videos?
+            - (später) high-level schema support
+            - (später) scans with multiple CPUs
+      - open source, MIT license
+            - der ganze rest
+            - incl. bindings
+            - (später) mysql
+            - (später) scans with single CPU
+    Die kommerzielle version wird über subscriptions bezahlt; solange die
+    Subscription bezahlt wird sind updates enthalten. Kosten: 1000 €/Jahr,
+    unabhängig von der Anzahl der Entwickler und Projekte.
+
+o btree_erase.cc:72 - if coupled_index > 0 oder >= 0?
+o btree_erase.cc:75 - wenn direkt remove_entry aufgerufen wird dann wird
+    der gelöschte key nochmal uncouple()d obwohl das unnötig ist
+
+o reimplement BtreeCursor::points_to (when extended keys are re-implemented)
+
+x hamsterdb.cc should not call env->flush when creating or erasing a
+    database. This should be called in LocalEnvironment! Otherwise
+    the RemoteEnvironment also sends the request.
+
+x run a test with the monster framework and check how much the disk space is
+    reduced (pick one where the file size in bdb is very small)
+    -> correct file size was not reported; fixed
+    -> run monster tests and performance tests once more
+
+. ham_env_open_db should no longer fail when opening a Database which
+    was already opened. There should be an internal reference counter
+    mechanism.
+    o ham_env_close(HAM_AUTO_CLEANUP) forces the reference counter to 0
+    o use this mechanism in hamserver (currently, it basically
+        ignores ham_db_close)
+>>>>>>> More fixes and a test program with multiple threads
 
 . java-test fails on a slower machine (race cond. in finalize()?)
     -> this is just a test issue

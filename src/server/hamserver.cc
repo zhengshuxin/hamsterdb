@@ -528,14 +528,7 @@ handle_env_open_db(ServerContext *srv, uv_stream_t *tcp,
     params[i].value = request->mutable_env_open_db_request()->mutable_param_values()->data()[i];
   }
 
-  /* check if the database is already open */
-  Handle<Database> handle = srv->get_db_by_name(dbname);
-  db = (ham_db_t *)handle.object;
-  db_handle = handle.index;
-
-  /* if not found: check if the Database was opened by another
-   * connection
-   * TODO this is not thread safe! - not really a problem because the server
+  /* TODO this is not thread safe! - not really a problem because the server
    * is currently single-threaded, though
    */
   if (!db) {
@@ -597,13 +590,15 @@ handle_db_close(ServerContext *srv, uv_stream_t *tcp, Protocol *request)
   if (!db) {
     /* accept this - most likely the database was already closed by
      * another process */
-    st = 0;
     srv->remove_db_handle(request->db_close_request().db_handle());
   }
   else {
-    st = ham_db_close((ham_db_t *)db, request->db_close_request().flags());
-    if (st == 0)
-      srv->remove_db_handle(request->db_close_request().db_handle());
+    srv->remove_db_handle(request->db_close_request().db_handle());
+    /* if the database is still open by another client then do NOT close it!
+     * otherwise call ham_db_close() */
+    Handle<Database> handle = srv->get_db_by_name(db->get_name());
+    if (!handle.object)
+      st = ham_db_close((ham_db_t *)db, request->db_close_request().flags());
   }
 
   Protocol reply(Protocol::DB_CLOSE_REPLY);
@@ -1131,6 +1126,7 @@ handle_cursor_erase(ServerContext *srv, uv_stream_t *tcp, Protocol *request)
   ham_assert(request->has_cursor_erase_request());
 
   Cursor *cursor = srv->get_cursor(request->cursor_erase_request().cursor_handle());
+
   if (!cursor)
     st = HAM_INV_PARAMETER;
   else
@@ -1353,115 +1349,87 @@ dispatch(ServerContext *srv, uv_stream_t *tcp, ham_u8_t *data, ham_size_t size)
 
   switch (wrapper->type()) {
     case ProtoWrapper_Type_CONNECT_REQUEST:
-      ham_trace(("dispatching CONNECT_REQUEST"));
       handle_connect(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DISCONNECT_REQUEST:
-      ham_trace(("dispatching DISCONNECT_REQUEST"));
       handle_disconnect(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_GET_PARAMETERS_REQUEST:
-      ham_trace(("dispatching ENV_GET_PARAMETERS_REQUEST"));
       handle_env_get_parameters(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_GET_DATABASE_NAMES_REQUEST:
-      ham_trace(("dispatching ENV_GET_DATABASE_NAMES_REQUEST"));
       handle_env_get_database_names(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_FLUSH_REQUEST:
-      ham_trace(("dispatching ENV_FLUSH_REQUEST"));
       handle_env_flush(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_RENAME_REQUEST:
-      ham_trace(("dispatching ENV_RENAME_REQUEST"));
       handle_env_rename(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_CREATE_DB_REQUEST:
-      ham_trace(("dispatching ENV_CREATE_DB_REQUEST"));
       handle_env_create_db(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_OPEN_DB_REQUEST:
-      ham_trace(("dispatching ENV_OPEN_DB_REQUEST"));
       handle_env_open_db(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_ENV_ERASE_DB_REQUEST:
-      ham_trace(("dispatching ENV_ERASE_DB_REQUEST"));
       handle_env_erase_db(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_CLOSE_REQUEST:
-      ham_trace(("dispatching DB_CLOSE_REQUEST"));
       handle_db_close(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_GET_PARAMETERS_REQUEST:
-      ham_trace(("dispatching DB_GET_PARAMETERS_REQUEST"));
       handle_db_get_parameters(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_CHECK_INTEGRITY_REQUEST:
-      ham_trace(("dispatching DB_CHECK_INTEGRITY_REQUEST"));
       handle_db_check_integrity(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_GET_KEY_COUNT_REQUEST:
-      ham_trace(("dispatching DB_GET_KEY_COUNT_REQUEST"));
       handle_db_get_key_count(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_INSERT_REQUEST:
-      ham_trace(("dispatching DB_INSERT_REQUEST"));
       handle_db_insert(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_FIND_REQUEST:
-      ham_trace(("dispatching DB_FIND_REQUEST"));
       handle_db_find(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_DB_ERASE_REQUEST:
-      ham_trace(("dispatching DB_ERASE_REQUEST"));
       handle_db_erase(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_TXN_BEGIN_REQUEST:
-      ham_trace(("dispatching TXN_BEGIN_REQUEST"));
       handle_txn_begin(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_TXN_COMMIT_REQUEST:
-      ham_trace(("dispatching TXN_COMMIT_REQUEST"));
       handle_txn_commit(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_TXN_ABORT_REQUEST:
-      ham_trace(("dispatching TXN_ABORT_REQUEST"));
       handle_txn_abort(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_CREATE_REQUEST:
-      ham_trace(("dispatching CURSOR_CREATE_REQUEST"));
       handle_cursor_create(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_CLONE_REQUEST:
-      ham_trace(("dispatching CURSOR_CLONE_REQUEST"));
       handle_cursor_clone(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_INSERT_REQUEST:
-      ham_trace(("dispatching CURSOR_INSERT_REQUEST"));
       handle_cursor_insert(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_ERASE_REQUEST:
-      ham_trace(("dispatching CURSOR_ERASE_REQUEST"));
       handle_cursor_erase(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_FIND_REQUEST:
-      ham_trace(("dispatching CURSOR_FIND_REQUEST"));
       handle_cursor_find(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_GET_DUPLICATE_COUNT_REQUEST:
-      ham_trace(("dispatching CURSOR_GET_DUPLICATE_COUNT_REQUEST"));
       handle_cursor_get_duplicate_count(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_OVERWRITE_REQUEST:
-      ham_trace(("dispatching CURSOR_OVERWRITE_REQUEST"));
       handle_cursor_overwrite(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_MOVE_REQUEST:
-      ham_trace(("dispatching CURSOR_MOVE_REQUEST"));
       handle_cursor_move(srv, tcp, wrapper);
       break;
     case ProtoWrapper_Type_CURSOR_CLOSE_REQUEST:
-      ham_trace(("dispatching CURSOR_CLOSE_REQUEST"));
       handle_cursor_close(srv, tcp, wrapper);
       break;
     default:
