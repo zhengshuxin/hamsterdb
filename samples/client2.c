@@ -173,14 +173,15 @@ run(void *arg)
 
 #ifdef WIN32
 static unsigned __stdcall /* _beginthreadex requires __stdcall */
-run5(void *arg)
 #else
 static void *
-run5(void *arg)
 #endif
+run5(void *arg)
 {
-  for (int i = 0; i < 5; i++)
+  int i;
+  for (i = 0; i < 5; i++)
     run(arg);
+  return (0);
 }
 
 int
@@ -190,13 +191,14 @@ main(int argc, char **argv)
 
 #ifdef WIN32
   HANDLE threads[NUM_THREADS];
-  
-  for (int i = 0; i < NUM_THREADS; i++) {
+  int i;
+
+  for (i = 0; i < NUM_THREADS; i++) {
     args[i] = i;
-    threads[i] = _beginthreadex(0, 0, run5, 0, 0, &args[i]);
+    threads[i] = (HANDLE)_beginthreadex(0, 0, run5, &args[i], 0, 0);
   }
 
-  for (int i = 0; i < NUM_THREADS; i++) {
+  for (i = 0; i < NUM_THREADS; i++) {
     WaitForSingleObject(threads[i], INFINITE);
     CloseHandle(threads[i]);
   }

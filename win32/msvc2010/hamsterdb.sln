@@ -58,6 +58,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ham_export", "ham_export.vc
 		{10DCD767-DFBE-4096-9258-111D4CAF09B0} = {10DCD767-DFBE-4096-9258-111D4CAF09B0}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample_client2", "sample_client2.vcxproj", "{57E4D0EF-495D-64A7-B819-29040FFB0791}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -258,6 +260,14 @@ Global
 		{D12AE71E-716F-46B0-9DDD-74125DA7985A}.Release|Win32.Build.0 = Release|Win32
 		{D12AE71E-716F-46B0-9DDD-74125DA7985A}.Release|x64.ActiveCfg = Release|x64
 		{D12AE71E-716F-46B0-9DDD-74125DA7985A}.Release|x64.Build.0 = Release|x64
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Debug|Win32.ActiveCfg = Debug|Win32
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Debug|Win32.Build.0 = Debug|Win32
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Debug|x64.ActiveCfg = Debug|x64
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Debug|x64.Build.0 = Debug|x64
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Release|Win32.ActiveCfg = Release|Win32
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Release|Win32.Build.0 = Release|Win32
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Release|x64.ActiveCfg = Release|x64
+		{57E4D0EF-495D-64A7-B819-29040FFB0791}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

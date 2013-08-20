@@ -278,6 +278,26 @@ x fix valgrind errors and leaks (or extend suppressions)
     x add remaining issues to suppressions (attn: there are two suppression
         files!)
 
+x neues test-programm machen mit 15 simultaneous clients, selbe db
+    x basierend auf client1.c
+    x assert weil socket nicht geschlossen wurde
+    x client hat "duplicate key" - warum?
+    x server crasht mit assert, wenn eine db "close" macht und eine andere
+        dann einen "find" -> benötigt reference counter? oder den close einfach
+        nicht durchführen?
+    x env_flush wird oft aufgerufen - warum??
+    x use cursor-API instead of regular API
+        -> fails w/ KEY_NOT_FOUND; seems to be a server-side issue?
+    x frequently open/reopen the cursor
+    x remove instrumentation in hamserver.cc
+    x store the new test (in the unittests-directory?)
+    x do NOT commit the modified client1.c file!
+    x run tests on windows
+    x the following messages do not need to send a full record in their
+        request: DbFind(Record), CursorFind(Record), CursorMove(key, record)
+        -> not true: need to transfer partial_offset, partial_size. But
+            the record data is not required
+
 o release-v2.pl enhancements
     x needs to run with enable-gcc-hardening tests
     x needs to run valgrind tests (check output - no leaks, no unsuppressed
@@ -292,48 +312,12 @@ o remote code crashes on win32
     o test the new sample in topic/remote on win32
     o send the new libraries to Phillip
 
-o neues test-programm machen mit 15 simultaneous clients, selbe db
-    x basierend auf client1.c
-    x assert weil socket nicht geschlossen wurde
-    x client hat "duplicate key" - warum?
-    x server crasht mit assert, wenn eine db "close" macht und eine andere
-        dann einen "find" -> benötigt reference counter? oder den close einfach
-        nicht durchführen?
-    x env_flush wird oft aufgerufen - warum??
-    x use cursor-API instead of regular API
-        -> fails w/ KEY_NOT_FOUND; seems to be a server-side issue?
-    x frequently open/reopen the cursor
-    x remove instrumentation in hamserver.cc
-    x store the new test (in the unittests-directory?)
-    x do NOT commit the modified client1.c file!
-    o run tests on windows
-    o the following messages do not need to send a full record in their
-        request: DbFind(Record), CursorFind(Record), CursorMove(key, record)
-        -> not true: need to transfer partial_offset, partial_size. But
-            the record data is not required
-
 o remote communication: should there be a configuration setting for
     client-side timeouts?
 
-Gedanken zum Business Model
-- Mongoose: so viel zugang weil es keine GPL ist! Eine mögliche Idee wäre:
-  Projekt splitten in
-      - kommerziellen closed source-anteil:
-            - concurrency
-            - server
-            - consulting (neue features, hilfe bei integration, review der
-                    implementation, portieren auf andere plattformen etc)
-            - trainings-videos?
-            - (später) high-level schema support
-            - (später) scans with multiple CPUs
-      - open source, MIT license
-            - der ganze rest
-            - incl. bindings
-            - (später) mysql
-            - (später) scans with single CPU
-    Die kommerzielle version wird über subscriptions bezahlt; solange die
-    Subscription bezahlt wird sind updates enthalten. Kosten: 1000 €/Jahr,
-    unabhängig von der Anzahl der Entwickler und Projekte.
+o server: what if there's a normal http request to the port? it should
+    refuse the connection and wait for the next connection.
+    just make sure this is no DOS attack.
 
 o btree_erase.cc:72 - if coupled_index > 0 oder >= 0?
 o btree_erase.cc:75 - wenn direkt remove_entry aufgerufen wird dann wird
