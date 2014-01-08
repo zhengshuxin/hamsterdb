@@ -60,12 +60,12 @@ o get rid of linked "totallist" of all pages
         be flushed to disk
     x get rid of the "totallist" linked list of all pages
     x get rid of the "bucket" linked list of all pages
-    o remove HAM_CACHE_FULL and HAM_CACHE_STRICT - don't think it is used
-    o move the unittests from cache.cpp to page_manager.cpp
-    o the PageManager knows whether a page is free or not
-        o no longer use the freelist to manage empty pages, only for blobs
-    o when allocating new pages: check the internal list, not the freelist
-    o store the modified list to disk, load it
+    x remove HAM_CACHE_FULL and HAM_CACHE_STRICT - don't think it is used
+    x the PageManager knows whether a page is free or not
+        x no longer use the freelist to manage empty pages, only for blobs
+    x when allocating new pages: check the internal list, not the freelist
+    o store the modified list on disk, load it
+    o move the unittests from cache.cpp to page_manager.cpp, update them
     o implement/update reclaim_space()
     o if logging is enabled: immediately write the modified state
         (later this will be rewritten as incremental updates for the log)
@@ -112,8 +112,8 @@ o simplify header page handling
     o try to become "coverity-clean"
 
 o support efficient logging
-    - merge journal and log into one single file
-    - if file exceeds a threshold (100 mb): start a new file
+    o merge journal and log into one single file
+    o if file exceeds a threshold (100 mb): start a new file
     - the btree/data file is INDEPENDENT from the log! it has only atomic
         updates and might become out-of-sync with the actual log. This is by
         design and must not cause problems! this will later allow us to run
@@ -125,6 +125,7 @@ o support efficient logging
     - the log buffers the data and only flushes/fsyncs when requested
         (TODO this needs to be clearly defined!)
     - the log can be compressed (PRO)
+    - use incremental logging for PageManager modifications
     - whenever a Btree page is flushed, the log will contain a "flush" marker
         of this page (and the lsn of the last update which modified this page).
         this marker is stored in the log's PageManager stream

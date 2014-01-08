@@ -198,8 +198,6 @@ ham_strerror(ham_status_t result)
       return ("Data blob not found");
     case HAM_IO_ERROR:
       return ("System I/O error");
-    case HAM_CACHE_FULL:
-      return ("Database cache is full");
     case HAM_NOT_IMPLEMENTED:
       return ("Operation not implemented");
     case HAM_FILE_NOT_FOUND:
@@ -346,13 +344,6 @@ ham_env_create(ham_env_t **henv, const char *filename,
     return (HAM_INV_PARAMETER);
   }
 
-  /* in-memory? don't allow cache limits! */
-  if ((flags & HAM_IN_MEMORY) && (flags & HAM_CACHE_STRICT)) {
-    ham_trace(("combination of HAM_IN_MEMORY and HAM_CACHE_STRICT "
-            "not allowed"));
-    return (HAM_INV_PARAMETER);
-  }
-
   /* in-memory? recovery is not possible */
   if ((flags & HAM_IN_MEMORY) && (flags & HAM_ENABLE_RECOVERY)) {
     ham_trace(("combination of HAM_IN_MEMORY and HAM_ENABLE_RECOVERY "
@@ -375,7 +366,6 @@ ham_env_create(ham_env_t **henv, const char *filename,
   ham_u32_t mask = HAM_ENABLE_FSYNC
             | HAM_IN_MEMORY
             | HAM_DISABLE_MMAP
-            | HAM_CACHE_STRICT
             | HAM_CACHE_UNLIMITED
             | HAM_ENABLE_RECOVERY
             | HAM_AUTO_RECOVERY
@@ -442,12 +432,10 @@ ham_env_create(ham_env_t **henv, const char *filename,
   }
 
   /* don't allow cache limits with unlimited cache */
-  if (flags & HAM_CACHE_UNLIMITED) {
-    if ((flags & HAM_CACHE_STRICT) || cache_size != 0) {
-      ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
-            "or HAM_CACHE_STRICT not allowed"));
-      return (HAM_INV_PARAMETER);
-    }
+  if (flags & HAM_CACHE_UNLIMITED && cache_size != 0) {
+    ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
+          "not allowed"));
+    return (HAM_INV_PARAMETER);
   }
 
   if (cache_size == 0)
@@ -708,12 +696,10 @@ ham_env_open(ham_env_t **henv, const char *filename, ham_u32_t flags,
   }
 
   /* don't allow cache limits with unlimited cache */
-  if (flags & HAM_CACHE_UNLIMITED) {
-    if ((flags & HAM_CACHE_STRICT) || cache_size != 0) {
-      ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
-            "or HAM_CACHE_STRICT not allowed"));
-      return (HAM_INV_PARAMETER);
-    }
+  if (flags & HAM_CACHE_UNLIMITED && cache_size != 0) {
+    ham_trace(("combination of HAM_CACHE_UNLIMITED and cache size != 0 "
+          "not allowed"));
+    return (HAM_INV_PARAMETER);
   }
 
   if (cache_size == 0)
