@@ -91,11 +91,14 @@ class Page {
 
     // The various linked lists (indices in m_prev, m_next)
     enum {
+      // list of all cached pages
+      kListCache              = 0,
+
       // list of all pages in a changeset
-      kListChangeset          = 2,
+      kListChangeset          = 1,
 
       // array limit
-      kListMax                = 3
+      kListMax                = 2
     };
 
     // non-persistent page flags

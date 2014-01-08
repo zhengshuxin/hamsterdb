@@ -147,7 +147,7 @@ struct DbFixture {
     // HAM_PACK_0 HAM_PACK_1 HAM_PACK_2 OFFSETOF
     REQUIRE(sizeof(PBlobHeader) == 28);
     REQUIRE(sizeof(PBtreeNode) == 33);
-    REQUIRE(sizeof(PEnvironmentHeader) == 20);
+    REQUIRE(sizeof(PEnvironmentHeader) == 28);
     REQUIRE(sizeof(PBtreeHeader) == 24);
     REQUIRE(sizeof(PFreelistPayload) == 3 * 8 + 4 + 1);
     REQUIRE(sizeof(PFreelistPageStatistics) ==

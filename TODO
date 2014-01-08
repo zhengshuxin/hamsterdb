@@ -50,7 +50,7 @@ x ham_bench: new test mode: first load with LOTS of data, then erase in the
         x only for stop-ops
     x add to monster tests
 
-o get rid of linked "totallist" of all pages
+o get rid of the freelist for pages (not yet for blobs)
     The PageManager keeps a (persistent) list of all pages, including their
     id, their size, the type, the database. It keeps a separate list with
     all free pages.
@@ -64,12 +64,24 @@ o get rid of linked "totallist" of all pages
     x the PageManager knows whether a page is free or not
         x no longer use the freelist to manage empty pages, only for blobs
     x when allocating new pages: check the internal list, not the freelist
-    o store the modified list on disk, load it
+    x store the modified list on disk, load it
+        x implement store/load methods
+        x store blob-id in the environment header 
+        x load when env is opened
+        x store when env is closed
+        x PageManager must accept entries which are available but do not
+            have a Page pointer
+        x fix unittests
+    x pax-layout with recsize == 0: must be much faster now
+        -> yes, but purge_cache requires 30% of the time now
+        x re-introduce totallist
     o move the unittests from cache.cpp to page_manager.cpp, update them
-    o implement/update reclaim_space()
+    o re-activate unittests in freelist.cpp (if it makes sense)
+        o implement/update reclaim_space()
+    o re-activate unittests in log.cpp
     o if logging is enabled: immediately write the modified state
         (later this will be rewritten as incremental updates for the log)
-    o pax-layout with recsize == 0: must be much faster now
+        why later? better now
 
 o blob pages track their own freelist in the page itself
     o remove direct I/O - it's not used anyway

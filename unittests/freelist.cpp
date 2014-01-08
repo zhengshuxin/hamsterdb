@@ -82,28 +82,6 @@ struct FreelistFixture {
     }
   }
 
-  void structureTest() {
-    open(HAM_DISABLE_RECLAIM_INTERNAL);
-
-    PFreelistPayload *f = (((LocalEnvironment *)m_env)->get_freelist_payload());
-
-    REQUIRE(0ull == f->get_overflow());
-    f->set_overflow(0x12345678ull);
-
-    f->set_start_address(0x7878787878787878ull);
-    REQUIRE(0x7878787878787878ull == f->get_start_address());
-    REQUIRE(0x12345678ull == f->get_overflow());
-
-    // reopen the database, check if the values were stored correctly
-    m_lenv->mark_header_page_dirty();
-
-    REQUIRE(0 == open(0));
-    f = (((LocalEnvironment *)m_env)->get_freelist_payload());
-
-    REQUIRE(0x7878787878787878ull == f->get_start_address());
-    REQUIRE(0x12345678ull == f->get_overflow());
-  }
-
   void markAllocPageTest() {
     ham_u32_t ps = m_lenv->get_page_size();
     ham_txn_t *txn;
@@ -510,12 +488,6 @@ TEST_CASE("Freelist/checkStructurePackingTest", "")
 {
   FreelistFixture f;
   f.checkStructurePackingTest();
-}
-
-TEST_CASE("Freelist/structureTest", "")
-{
-  FreelistFixture f;
-  f.structureTest();
 }
 
 TEST_CASE("Freelist/markAllocAlignedTest", "")

@@ -50,14 +50,6 @@ struct CacheFixture {
   }
 };
 
-TEST_CASE("Cache/newDelete", "Tests the Cache")
-{
-  CacheFixture f;
-  Cache *cache = new Cache((LocalEnvironment *)f.m_env, 15);
-  REQUIRE(cache != 0);
-  delete cache;
-}
-
 TEST_CASE("Cache/putGet", "Tests the Cache")
 {
   CacheFixture f;
@@ -210,88 +202,6 @@ TEST_CASE("Cache/overflowTest", "Tests the Cache")
   }
 
   REQUIRE(false == cache->is_too_big());
-  delete cache;
-}
-
-TEST_CASE("Cache/strict", "Tests the Cache")
-{
-  CacheFixture f;
-  f.teardown();
-
-  ham_parameter_t param[] = {
-    { HAM_PARAM_PAGESIZE, 1024 * 128 },
-    { 0, 0 }
-  };
-
-  Page *p[1024];
-
-  REQUIRE(0 ==
-      ham_env_create(&f.m_env, Globals::opath(".test"),  
-          HAM_CACHE_STRICT | HAM_DISABLE_MMAP, 0644, &param[0]));
-  REQUIRE(0 ==
-      ham_env_create_db(f.m_env, &f.m_db, 13, 0, 0));
-
-  Cache *cache = ((LocalEnvironment *)f.m_env)->get_page_manager()->test_get_cache();
-
-  REQUIRE(cache->get_capacity() == 1024 * 1024 * 2u);
-
-  unsigned int max_pages = HAM_DEFAULT_CACHESIZE / (1024 * 128);
-  unsigned int i;
-  for (i = 0; i < max_pages; i++)
-    REQUIRE((p[i] = f.alloc_page()));
-
-  REQUIRE_CATCH(f.alloc_page(), HAM_CACHE_FULL);
-  ((LocalEnvironment *)f.m_env)->get_page_manager()->purge_cache();
-  REQUIRE((p[i] = f.alloc_page()));
-}
-
-TEST_CASE("Cache/setSizeEnvCreate", "Tests the Cache")
-{
-  CacheFixture f;
-  f.teardown();
-
-  ham_parameter_t param[] = {
-    { HAM_PARAM_CACHESIZE, 100 * 1024 },
-    { HAM_PARAM_PAGESIZE,  1024 },
-    { 0, 0 }
-  };
-
-  REQUIRE(0 ==
-      ham_env_create(&f.m_env, Globals::opath(".test"),  
-          HAM_CACHE_STRICT, 0644, &param[0]));
-  REQUIRE(0 ==
-      ham_env_create_db(f.m_env, &f.m_db, 13, 0, 0));
-
-  Cache *cache = ((LocalEnvironment *)f.m_env)->get_page_manager()->test_get_cache();
-
-  REQUIRE(102400ull == cache->get_capacity());
-}
-
-TEST_CASE("Cache/setSizeEnvOpen", "Tests the Cache")
-{
-  CacheFixture f;
-  f.teardown();
-
-  ham_parameter_t param[] = {
-    { HAM_PARAM_CACHESIZE, 100 * 1024 },
-    { 0, 0 }
-  };
-
-  REQUIRE(0 ==
-      ham_env_open(&f.m_env, Globals::opath(".test"), 0, &param[0]));
-
-  Cache *cache = ((LocalEnvironment *)f.m_env)->get_page_manager()->test_get_cache();
-
-  REQUIRE(102400ull == cache->get_capacity());
-}
-
-TEST_CASE("Cache/bigSize", "Tests the Cache")
-{
-  CacheFixture f;
-  ham_u64_t size = 1024ull * 1024ull * 1024ull * 16ull;
-  Cache *cache = new Cache((LocalEnvironment *)f.m_env, size);
-  REQUIRE(cache != 0);
-  REQUIRE(size == cache->get_capacity());
   delete cache;
 }
 

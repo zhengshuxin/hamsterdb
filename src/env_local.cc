@@ -72,7 +72,7 @@ LocalEnvironment::~LocalEnvironment()
 
 ham_status_t
 LocalEnvironment::create(const char *filename, ham_u32_t flags,
-        ham_u32_t mode, ham_u32_t page_size, ham_u32_t cache_size,
+        ham_u32_t mode, ham_u32_t page_size, ham_u64_t cache_size,
         ham_u16_t max_databases)
 {
   set_flags(flags);
@@ -133,7 +133,7 @@ LocalEnvironment::create(const char *filename, ham_u32_t flags,
 
 ham_status_t
 LocalEnvironment::open(const char *filename, ham_u32_t flags,
-        ham_u32_t cache_size)
+        ham_u64_t cache_size)
 {
   ham_status_t st;
 
@@ -232,6 +232,13 @@ fail_with_fake_cleansing:
 
   /* load page manager after setting up the blobmanager and the device! */
   m_page_manager = new PageManager(this, cache_size);
+
+  /* load the state of the PageManager */
+  if (m_header->get_page_manager_blobid() != 0) {
+    m_page_manager->load_state(m_header->get_page_manager_blobid());
+    if (get_flags() & HAM_ENABLE_RECOVERY)
+      get_changeset().clear();
+  }
 
   /*
    * open the logfile and check if we need recovery. first open the
@@ -396,6 +403,17 @@ LocalEnvironment::close(ham_u32_t flags)
       st = db->close(flags);
     if (st)
       return (st);
+  }
+
+  // store the state of the PageManager
+  if (m_page_manager && (get_flags() & HAM_READ_ONLY) == 0) {
+    ham_u64_t new_blobid = m_page_manager->store_state();
+    if (new_blobid != get_header()->get_page_manager_blobid()) {
+      get_header()->set_page_manager_blobid(new_blobid);
+      get_header()->get_header_page()->set_dirty(true);
+      if (m_log && (flags & HAM_DONT_CLEAR_LOG) == 0)
+        get_changeset().flush(get_incremented_lsn());
+    }
   }
 
   /* flush all committed transactions */

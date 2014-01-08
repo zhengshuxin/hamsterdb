@@ -32,11 +32,10 @@ class PageManager {
   private:
     // The state of a page
     struct PageState {
-      PageState(ham_u64_t _birthday = 0, Page *_page = 0)
-        : birthday(_birthday), page(_page), is_free(false) {
+      PageState(Page *_page = 0)
+        : page(_page), is_free(false) {
       }
 
-      ham_u64_t birthday;
       Page *page;
       bool is_free;
     };
@@ -62,10 +61,16 @@ class PageManager {
     // Default constructor
     //
     // The cache size is specified in bytes!
-    PageManager(LocalEnvironment *env, ham_u32_t cache_size);
+    PageManager(LocalEnvironment *env, ham_u64_t cache_size);
 
     // Destructor
     ~PageManager();
+
+    // loads the state from a blob
+    void load_state(ham_u64_t blobid);
+
+    // stores the state to a blob; returns the blobid
+    ham_u64_t store_state() const;
 
     // Fills in the current metrics for the PageManager, the Cache and the
     // Freelist
@@ -170,8 +175,6 @@ class PageManager {
 
     // Fetches a page from the list
     Page *fetch_page(ham_u64_t id) {
-      m_epoch++;
-
       PageMap::iterator it = m_page_map.find(id);
       if (it != m_page_map.end())
         return (it->second.page);
@@ -180,9 +183,41 @@ class PageManager {
 
     // Stores a page in the list
     void store_page(Page *page) {
-      ham_assert(m_page_map.find(page->get_address()) == m_page_map.end());
-      PageState ps = PageState(m_epoch, page);
+      // if the entry exists then its page pointer must be null!
+      ham_assert(m_page_map.find(page->get_address()) != m_page_map.end()
+                      ? m_page_map[page->get_address()].page == 0
+                      : true);
+
+      /* first remove the page from the cache, if it's already cached */
+      if (page->is_in_list(m_totallist, Page::kListCache))
+        remove_from_totallist(page);
+
+      /* now (re-)insert into the list of all cached pages; pages at the front
+       * of |m_totallist| are less likely to be purged if we run out of
+       * memory */
+      ham_assert(!page->is_in_list(m_totallist, Page::kListCache));
+      m_totallist = page->list_insert(m_totallist, Page::kListCache);
+
+      /* is this the chronologically oldest page? then set the pointer */
+      if (!m_totallist_tail)
+        m_totallist_tail = page;
+
+      PageState ps = PageState(page);
       m_page_map[page->get_address()] = ps;
+      m_is_modified = true;
+    }
+
+    void remove_from_totallist(Page *page) {
+      /* are we removing the chronologically oldest page? then
+       * update the pointer with the next oldest page */
+      if (m_totallist_tail == page)
+        m_totallist_tail = page->get_previous(Page::kListCache);
+      m_totallist = page->list_remove(m_totallist, Page::kListCache);
+    }
+
+    /** returns true if the cache is full */
+    bool cache_is_full() const {
+      return (m_page_map.size() * m_env->get_page_size() > m_cache_size);
     }
 
     // The current Environment handle
@@ -195,11 +230,20 @@ class PageManager {
     PageMap m_page_map;
 
     // The cache size (in bytes)
-    ham_u32_t m_cache_size;
+    ham_u64_t m_cache_size;
 
-    // the current epoch (a monotonic counter to calculate the "age" of
-    // a cached page)
-    ham_u64_t m_epoch;
+    // Whether the page_map was modified or not
+    bool m_is_modified;
+
+    // blobid of the persisted state
+    ham_u64_t m_blobid;
+
+    /** linked list of ALL cached pages */
+    Page *m_totallist;
+
+    /** the tail of the linked "totallist" - this is the oldest element,
+     * and therefore the highest candidate for a flush */
+    Page *m_totallist_tail;
 
     // tracks number of fetched pages
     ham_u64_t m_page_count_fetched;

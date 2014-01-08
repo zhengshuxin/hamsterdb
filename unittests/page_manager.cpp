@@ -84,6 +84,44 @@ struct PageManagerFixture {
     PageManager *pm = ((LocalEnvironment *)m_env)->get_page_manager();
     REQUIRE_CATCH(pm->fetch_page(0, 1024 * 1024 * 200, false), HAM_IO_ERROR);
   }
+
+  void setCacheSizeEnvCreate() {
+    REQUIRE(0 == ham_env_close(m_env, HAM_AUTO_CLEANUP));
+
+    ham_db_t *db = 0;
+    ham_parameter_t param[] = {
+      { HAM_PARAM_CACHE_SIZE, 100 * 1024 },
+      { HAM_PARAM_PAGE_SIZE,  1024 },
+      { 0, 0 }
+    };
+
+    REQUIRE(0 ==
+        ham_env_create(&m_env, Globals::opath(".test"),  
+            0, 0644, &param[0]));
+    REQUIRE(0 ==
+        ham_env_create_db(m_env, &db, 13, 0, 0));
+
+    LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+
+    REQUIRE(102400ull == lenv->get_page_manager()->m_cache_size);
+  }
+
+  void setCacheSizeEnvOpen(ham_u64_t size) {
+    REQUIRE(0 == ham_env_close(m_env, HAM_AUTO_CLEANUP));
+
+    ham_parameter_t param[] = {
+      { HAM_PARAM_CACHE_SIZE, size },
+      { 0, 0 }
+    };
+
+    REQUIRE(0 ==
+        ham_env_open(&m_env, Globals::opath(".test"),  
+            0, &param[0]));
+
+    LocalEnvironment *lenv = (LocalEnvironment *)m_env;
+
+    REQUIRE(size == lenv->get_page_manager()->m_cache_size);
+  }
 };
 
 TEST_CASE("PageManager/newDelete", "")
@@ -110,6 +148,23 @@ TEST_CASE("PageManager/fetchInvalidPage", "")
   f.fetchInvalidPageTest();
 }
 
+TEST_CASE("PageManager/setCacheSizeEnvCreate", "")
+{
+  PageManagerFixture f;
+  f.setCacheSizeEnvCreate();
+}
+
+TEST_CASE("PageManager/setCacheSizeEnvOpen", "")
+{
+  PageManagerFixture f;
+  f.setCacheSizeEnvOpen(100 * 1024);
+}
+
+TEST_CASE("PageManager/setBigCacheSizeEnvOpen", "")
+{
+  PageManagerFixture f;
+  f.setCacheSizeEnvOpen(1024ull * 1024ull * 1024ull * 16ull);
+}
 
 TEST_CASE("PageManager-inmem/newDelete", "")
 {

@@ -11,6 +11,7 @@
 
 #include <string.h>
 
+#include "util.h"
 #include "page.h"
 #include "device.h"
 #include "btree_index.h"
@@ -20,11 +21,11 @@
 
 namespace hamsterdb {
 
-PageManager::PageManager(LocalEnvironment *env, ham_u32_t cache_size)
-  : m_env(env), m_freelist(0), m_cache_size(cache_size), m_epoch(0),
-    m_page_count_fetched(0), m_page_count_flushed(0), m_page_count_index(0),
-    m_page_count_blob(0), m_page_count_freelist(0), m_cache_hits(0),
-    m_cache_misses(0)
+PageManager::PageManager(LocalEnvironment *env, ham_u64_t cache_size)
+  : m_env(env), m_freelist(0), m_cache_size(cache_size), m_is_modified(false),
+    m_blobid(0), m_totallist(0), m_totallist_tail(0), m_page_count_fetched(0),
+    m_page_count_flushed(0), m_page_count_index(0), m_page_count_blob(0),
+    m_page_count_freelist(0), m_cache_hits(0), m_cache_misses(0)
 {
 }
 
@@ -34,6 +35,69 @@ PageManager::~PageManager()
     delete m_freelist;
     m_freelist = 0;
   }
+}
+
+void
+PageManager::load_state(ham_u64_t blobid)
+{
+  m_blobid = blobid;
+
+  ByteArray buffer;
+  ham_record_t rec = {0};
+
+  // read the blob
+  m_env->get_blob_manager()->read(0, blobid, &rec, 0, &buffer);
+
+  ham_u8_t *p = (ham_u8_t *)rec.data;
+
+  // set up the state
+  ham_u32_t counter = ham_db2h32(*(ham_u32_t *)p);
+  p += 4;
+
+  for (ham_u32_t i = 0; i < counter; i++) {
+    ham_u64_t id = ham_db2h64(*(ham_u64_t *)p);
+    p += 8;
+    bool is_free = *p ? true : false;
+    p += 1;
+    ham_assert(p - (ham_u8_t *)rec.data <= rec.size);
+
+    PageState ps = PageState(0);
+    ps.is_free = is_free;
+    m_page_map[id] = ps;
+  }
+}
+
+ham_u64_t
+PageManager::store_state() const
+{
+  // no modifications? then simply return the old blobid
+  if (!m_is_modified)
+    return (m_blobid);
+
+  ByteArray buffer(m_page_map.size() * 9 + 4);
+
+  ham_u8_t *p = (ham_u8_t *)buffer.get_ptr();
+
+  // store the number of elements
+  *(ham_u32_t *)p = ham_h2db32(m_page_map.size());
+  p += 4;
+
+  for (PageMap::const_iterator it = m_page_map.begin();
+                  it != m_page_map.end(); it++) {
+    *(ham_u64_t *)p = ham_h2db64(it->first);
+    p += 8;
+    *p = it->second.is_free ? 1 : 0;
+    p += 1;
+  }
+
+  ham_record_t rec = {0};
+  rec.data = buffer.get_ptr();
+  rec.size = buffer.get_size();
+
+  if (m_blobid)
+    return (m_env->get_blob_manager()->overwrite(0, m_blobid, &rec, 0));
+  else
+    return (m_env->get_blob_manager()->allocate(0, &rec, 0));
 }
 
 void
@@ -112,11 +176,15 @@ PageManager::alloc_page(LocalDatabase *db, ham_u32_t page_type, ham_u32_t flags)
       if (it->second.is_free) {
         it->second.is_free = false;
         page = it->second.page;
-        goto done;
+        if (page)
+          goto done;
+        freelist = it->first;
+        break;
       }
     }
 
-    freelist = m_freelist->alloc_page();
+    if (freelist == 0)
+      freelist = m_freelist->alloc_page();
     if (freelist > 0) {
       ham_assert(freelist % m_env->get_page_size() == 0);
       /* try to fetch the page from the cache */
@@ -193,6 +261,8 @@ PageManager::flush_all_pages(bool nodelete)
 {
   for (PageMap::iterator it = m_page_map.begin();
                   it != m_page_map.end(); it++) {
+    if (!it->second.page)
+      continue;
     flush_page(it->second.page);
     // if the page will be deleted then uncouple all cursors
     if (!nodelete) {
@@ -212,6 +282,9 @@ PageManager::purge_cache()
   if (m_env->get_flags() & HAM_IN_MEMORY)
     return;
 
+  if (!cache_is_full())
+    return;
+
   /* calculate a limit of pages that we will flush */
   unsigned max_pages = m_page_map.size();
 
@@ -222,24 +295,30 @@ PageManager::purge_cache()
     max_pages = kPurgeLimit;
 
   unsigned i = 0;
-  PageMap::iterator it = m_page_map.begin();
-  while (it != m_page_map.end() && i < max_pages) {
-    Page *page = it->second.page;
+  
+  /* start with the oldest page */
+  Page *page = m_totallist_tail;
+  while (page && i < max_pages) {
     /* pick the page if it's unused, (not in a changeset), NOT mapped and old
      * enough */
     if (page->get_flags() & Page::kNpersMalloc
             && !m_env->get_changeset().contains(page)
-            && page->get_address() > 0
-            && m_epoch - it->second.birthday > kPurgeThreshold) {
-      flush_page(it->second.page);
-      BtreeCursor::uncouple_all_cursors(it->second.page);
-      delete it->second.page;
-      m_page_map.erase(it++);
-      i++;
+            && page->get_address() > 0) {
+      flush_page(page);
+      BtreeCursor::uncouple_all_cursors(page);
+
+      remove_from_totallist(page);
+
+      PageMap::iterator it = m_page_map.find(page->get_address());
+      ham_assert(it != m_page_map.end());
+
+      Page *prev = page->get_previous(Page::kListCache);
+      delete page;
+      m_page_map.erase(it);
+      page = prev;
     }
-    else {
-      ++it;
-    }
+    else
+      page = page->get_previous(Page::kListCache);
   }
 }
 
@@ -249,7 +328,7 @@ PageManager::close_database(Database *db)
   PageMap::iterator it = m_page_map.begin();
   while (it != m_page_map.end()) {
     Page *page = it->second.page;
-    if (page->get_address() > 0 && page->get_db() == db) {
+    if (page && page->get_address() > 0 && page->get_db() == db) {
       flush_page(page);
       BtreeCursor::uncouple_all_cursors(page);
       delete page;
@@ -259,6 +338,9 @@ PageManager::close_database(Database *db)
       ++it;
     }
   }
+
+  m_totallist = 0;
+  m_totallist_tail = 0;
 }
 
 void
@@ -318,6 +400,7 @@ PageManager::add_to_freelist(Page *page)
 void
 PageManager::close()
 {
+  // flush all dirty pages to disk
   flush_all_pages();
 
   // reclaim unused disk space
@@ -333,12 +416,14 @@ PageManager::close()
     try_reclaim = false;
 #endif
 
+  /* TODO implement me 
   if (try_reclaim) {
     reclaim_space();
 
     if (m_env->get_flags() & HAM_ENABLE_RECOVERY)
       m_env->get_changeset().flush(m_env->get_incremented_lsn());
   }
+  */
 
   // flush again; there were pages fetched during reclaim, and they have
   // to be released now

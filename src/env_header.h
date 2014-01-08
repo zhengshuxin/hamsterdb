@@ -45,6 +45,9 @@ typedef HAM_PACK_0 struct HAM_PACK_1
   /** reserved */
   ham_u16_t _reserved1;
 
+  /** blob id of the PageManager's state */
+  ham_u64_t _pm_state;
+
   /*
    * following here:
    *
@@ -135,6 +138,16 @@ class EnvironmentHeader
     // Sets the page size in the header page
     void set_page_size(ham_u32_t ps) {
       get_header()->_page_size = ham_h2db32(ps);
+    }
+
+    // Returns the PageManager's blob id
+    ham_u64_t get_page_manager_blobid() {
+      return (ham_db2h64(get_header()->_pm_state));
+    }
+
+    // Sets the page size in the header page
+    void set_page_manager_blobid(ham_u64_t blobid) {
+      get_header()->_pm_state = ham_h2db64(blobid);
     }
 
     // Returns the header page with persistent configuration settings
