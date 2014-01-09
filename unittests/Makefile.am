@@ -30,6 +30,7 @@ test_SOURCES    = aes.cpp \
                   globals.h \
                   hamsterdb.cpp \
                   journal.cpp \
+				  log.cpp \
 				  main.cpp \
                   misc.cpp \
                   os.cpp \

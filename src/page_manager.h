@@ -70,7 +70,7 @@ class PageManager {
     void load_state(ham_u64_t blobid);
 
     // stores the state to a blob; returns the blobid
-    ham_u64_t store_state() const;
+    ham_u64_t store_state();
 
     // Fills in the current metrics for the PageManager, the Cache and the
     // Freelist
@@ -150,14 +150,15 @@ class PageManager {
     void test_remove_page(Page *page) {
       PageMap::iterator it = m_page_map.find(page->get_address());
       ham_assert(it != m_page_map.end());
+      remove_from_totallist(page);
       m_page_map.erase(it);
     }
 
   private:
     friend struct BlobManagerFixture;
-    friend struct CacheFixture;
     friend struct FreelistFixture;
     friend struct PageManagerFixture;
+    friend struct LogHighLevelFixture;
 
     // Returns the freelist; only for testing!
     Freelist *test_get_freelist() {
@@ -204,7 +205,9 @@ class PageManager {
 
       PageState ps = PageState(page);
       m_page_map[page->get_address()] = ps;
-      m_is_modified = true;
+
+      /* write to disk (if necessary) */
+      maybe_store_state();
     }
 
     void remove_from_totallist(Page *page) {
@@ -220,6 +223,17 @@ class PageManager {
       return (m_page_map.size() * m_env->get_page_size() > m_cache_size);
     }
 
+    /* if recovery is enabled then immediately write the modified blob */
+    void maybe_store_state() {
+      if (m_env->get_flags() & HAM_ENABLE_RECOVERY) {
+        ham_u64_t new_blobid = store_state();
+        if (new_blobid != m_env->get_header()->get_page_manager_blobid()) {
+          m_env->get_header()->set_page_manager_blobid(new_blobid);
+          m_env->get_header()->get_header_page()->set_dirty(true);
+        }
+      }
+    }
+
     // The current Environment handle
     LocalEnvironment *m_env;
 
@@ -232,8 +246,8 @@ class PageManager {
     // The cache size (in bytes)
     ham_u64_t m_cache_size;
 
-    // Whether the page_map was modified or not
-    bool m_is_modified;
+    // Whether the page_map must be flushed or not
+    bool m_needs_flush;
 
     // blobid of the persisted state
     ham_u64_t m_blobid;

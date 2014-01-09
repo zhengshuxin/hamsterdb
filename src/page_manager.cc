@@ -22,7 +22,7 @@
 namespace hamsterdb {
 
 PageManager::PageManager(LocalEnvironment *env, ham_u64_t cache_size)
-  : m_env(env), m_freelist(0), m_cache_size(cache_size), m_is_modified(false),
+  : m_env(env), m_freelist(0), m_cache_size(cache_size), m_needs_flush(false),
     m_blobid(0), m_totallist(0), m_totallist_tail(0), m_page_count_fetched(0),
     m_page_count_flushed(0), m_page_count_index(0), m_page_count_blob(0),
     m_page_count_freelist(0), m_cache_hits(0), m_cache_misses(0)
@@ -68,11 +68,12 @@ PageManager::load_state(ham_u64_t blobid)
 }
 
 ham_u64_t
-PageManager::store_state() const
+PageManager::store_state()
 {
   // no modifications? then simply return the old blobid
-  if (!m_is_modified)
+  if (!m_needs_flush)
     return (m_blobid);
+  m_needs_flush = false;
 
   ByteArray buffer(m_page_map.size() * 9 + 4);
 
@@ -175,6 +176,9 @@ PageManager::alloc_page(LocalDatabase *db, ham_u32_t page_type, ham_u32_t flags)
                   it != m_page_map.end(); it++) {
       if (it->second.is_free) {
         it->second.is_free = false;
+        m_needs_flush = true;
+        maybe_store_state();
+
         page = it->second.page;
         if (page)
           goto done;
@@ -386,6 +390,9 @@ PageManager::add_to_freelist(Page *page)
   ham_assert(it->second.is_free == false);
   it->second.is_free = true;
 
+  m_needs_flush = true;
+  maybe_store_state();
+
   Freelist *f = get_freelist();
 
   if (page->get_node_proxy()) {
@@ -406,9 +413,9 @@ PageManager::close()
   // reclaim unused disk space
   // if logging is enabled: also flush the changeset to write back the
   // modified freelist pages
-  bool try_reclaim = m_env->get_flags() & HAM_DISABLE_RECLAIM_INTERNAL
-                ? false
-                : true;
+  //bool try_reclaim = m_env->get_flags() & HAM_DISABLE_RECLAIM_INTERNAL
+                //? false
+                //: true;
 #ifdef WIN32
   // Win32: it's not possible to truncate the file while there's an active
   // mapping, therefore only reclaim if memory mapped I/O is disabled

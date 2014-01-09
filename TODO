@@ -23,14 +23,6 @@ x improvements for ham_bench
 - delta updates (maybe)
 -----------------------------------------------------------------------------
 
-o web-page requires updates
-    o deployed html differs from git-repository
-    o www1
-        o merge git repository of www1 (host on github, keep remote branch)
-        o clean up 'dl' directory
-        o where to host static files?
-        o backup and deploy to www2, use round-robin DNS
-
 x update copyright string: 2013 -> 2014
 
 x check for scalability issues with files > 1 GB and check if we're on the
@@ -50,7 +42,7 @@ x ham_bench: new test mode: first load with LOTS of data, then erase in the
         x only for stop-ops
     x add to monster tests
 
-o get rid of the freelist for pages (not yet for blobs)
+x get rid of the freelist for pages (not yet for blobs)
     The PageManager keeps a (persistent) list of all pages, including their
     id, their size, the type, the database. It keeps a separate list with
     all free pages.
@@ -75,33 +67,91 @@ o get rid of the freelist for pages (not yet for blobs)
     x pax-layout with recsize == 0: must be much faster now
         -> yes, but purge_cache requires 30% of the time now
         x re-introduce totallist
-    o move the unittests from cache.cpp to page_manager.cpp, update them
-    o re-activate unittests in freelist.cpp (if it makes sense)
-        o implement/update reclaim_space()
-    o re-activate unittests in log.cpp
-    o if logging is enabled: immediately write the modified state
+    x move the unittests from cache.cpp to page_manager.cpp, update them
+    x do not persist state if Environment is in-memory 
+    x re-activate unittests in log.cpp
+    x if logging is enabled: immediately write the modified state
         (later this will be rewritten as incremental updates for the log)
-        why later? better now
+        x verify recovery tests
 
-o blob pages track their own freelist in the page itself
-    o remove direct I/O - it's not used anyway
-    o need a counter with the number of free bytes left
-    o completely get rid of the freelist
+==================================
+
+I do not like how the PM currently stores its state. Its data should be
+separated from the rest, otherwise we run again into difficult situations
+when the Environment is shut down.
+
+Suggestion:
+- store state in a linked list of pages. each database stores its pages (index
+    AND blobs) in groups, and each group stores its state in one of those
+    linked pages. the size of a group therefore depends on how much
+    information fits into such a page (guestimate: over 700). 
+    - advantage: dropping a database just means that all PageGroups of this
+        database are dropped
+    - complexity: the PM has to manage those groups
+    - each PageGroup is responsible for its freelist management
+    - it can also handle pages of different sizes and logical page IDs
+    - if the PM state is modified then only the relevant PageGroup will
+        be logged (in their surrounding Transaction)
+
+==================================
 
 o support pages with different sizes
-    o each page can have a different size
-    o the PageManager knows about these sizes and the mapping of page id to
-        address
+    o each database can have a different size, but the size is constant
+        for all pages from this database (for now)
+        o page stores its size non-persistently
+        o remove env->get_page_size(), device->get_page_size()
+    o each blob page has a size of 1 MB (default), but can be larger
+        o blob page stores size in its blob page-header
+    o PageManager state does not need to store space for pages with default
+        size
+
+    o PageManager->is_cache_full() must take the sizes in account
+    o make sure that the log can work with different sizes
+    o if a free page is deleted then delete the Page pointer, but keep the
+        entry in the map, otherwise we lose the information whether the page
+        is free
+    o when allocating a page: check freelist for pages with this size
+    o make database header page much smaller (1 kb?)
+
+o blob pages track their own freelist in the page itself
+    o very large blob pages no longer span multiple blobs but create a
+        single page which is large enough
+        (as a result, EVERY blob page has now a header!)
+    o blob: remove direct I/O - it's not used anyway
+    o need a counter with the number of free bytes left
+    o keep the actual freelist VERY simple - i.e. do not merge empty
+        blobs, only store the 32 largest free entries etc
+    o The PageManager knows where to find free sizes - but make sure that it
+        does not store too much data!
+    o completely get rid of the freelist
+    o re-activate unittests in freelist.cpp (if it makes sense)
+        o implement/update reclaim_space()
+        o try to have a clean solution for the chicken/egg problem (the
+            PageManager writes its state during shutdown, but this modifies
+            its state) 
+    o run performance tests
+
+o verify/improve performance of btree_impl_default: it has a very high
+    number of page splits compared to 2.1.3, even if the key size is <= 21.
+    Why? maybe the capacity is not calculated correctly. or do keys have
+    more overhead than in 2.1.3?
+
+o web-page requires updates
+    o deployed html differs from git-repository
+    o www1
+        o merge git repository of www1 (host on github, keep remote branch)
+        o clean up 'dl' directory
+        o where to host static files?
+        o backup and deploy to www2, use round-robin DNS
+
+o support pages with different sizes (cont...)
     o databases can have different default sizes, depending on their
         configuration (same for blobs)
         - increase for large key sizes
         - increase for duplicate keys
         - increase for blob pages
-    o merge adjacent free pages
+    o merge adjacent free pages (or not?)
     o implement check_integrity() and add calls and asserts after modifications
-    o make sure that the log can work with different sizes
-    o very large blob pages no longer span multiple blobs but create a
-        single page which is large enough
     o remove HAM_PARAM_PAGE_SIZE parameter from ham_env_create
     o add HAM_PARAM_PAGE_SIZE_LOW, HAM_PARAM_PAGE_SIZE_HIGH parameter
         to ham_env_create_db
@@ -109,10 +159,8 @@ o support pages with different sizes
         atomic operation in the PageManager, but also needs to be reflected
         in the log somehow?
 
-o Pages no longer form linked lists; this is now handled by the PageManager
-
 o simplify header page handling
-    o header page has a fixed id (i.e. = db-name), no need to store ID
+    o db root page has a fixed id (i.e. = db-name), no need to store ID
         in the env-header
     o if the header page is replaced: only the PageManager is updated!
     o the header page will become very small (1kb or less) and read-only, not

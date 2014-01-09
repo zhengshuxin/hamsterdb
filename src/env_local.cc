@@ -406,7 +406,9 @@ LocalEnvironment::close(ham_u32_t flags)
   }
 
   // store the state of the PageManager
-  if (m_page_manager && (get_flags() & HAM_READ_ONLY) == 0) {
+  if (m_page_manager
+      && (get_flags() & HAM_IN_MEMORY) == 0
+      && (get_flags() & HAM_READ_ONLY) == 0) {
     ham_u64_t new_blobid = m_page_manager->store_state();
     if (new_blobid != get_header()->get_page_manager_blobid()) {
       get_header()->set_page_manager_blobid(new_blobid);

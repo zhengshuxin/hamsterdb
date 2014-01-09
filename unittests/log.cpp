@@ -72,14 +72,7 @@ struct LogFixture {
   }
 
   void createCloseTest() {
-    Log *log = disconnect_log_and_create_new_log();
-
-    /* TODO make sure that the file exists and
-     * contains only the header */
-
-    REQUIRE(true == log->is_empty());
-
-    log->close();
+    REQUIRE(true == m_lenv->get_log()->is_empty());
   }
 
   void createCloseOpenCloseTest() {
@@ -89,7 +82,6 @@ struct LogFixture {
 
     log->open();
     REQUIRE(true == log->is_empty());
-    log->close();
   }
 
   void negativeCreateTest() {
@@ -134,7 +126,6 @@ struct LogFixture {
     log->append_write(1, 0, 0, data, sizeof(data));
 
     REQUIRE(0 == ham_txn_abort(txn, 0));
-    log->close();
   }
 
   void clearTest() {
@@ -151,7 +142,6 @@ struct LogFixture {
     REQUIRE(true == log->is_empty());
 
     REQUIRE(0 == ham_txn_abort(txn, 0));
-    log->close();
   }
 
   void iterateOverEmptyLogTest() {
@@ -164,8 +154,6 @@ struct LogFixture {
     log->get_entry(&iter, &entry, &buffer);
     REQUIRE((ham_u64_t)0 == entry.lsn);
     REQUIRE(0 == buffer.get_size());
-
-    log->close();
   }
 
   void iterateOverLogOneEntryTest() {
@@ -191,7 +179,6 @@ struct LogFixture {
     REQUIRE((ham_u64_t)1 == log->get_lsn());
 
     REQUIRE(0 == ham_txn_abort(txn, 0));
-    log->close();
   }
 
   void checkLogEntry(Log *log, Log::PEntry *entry, ham_u64_t lsn, void *data) {
@@ -552,7 +539,7 @@ struct LogHighLevelFixture {
     REQUIRE(0 == ham_env_close(env, HAM_AUTO_CLEANUP));
   }
 
-  void recoverAllocatePageTest() {
+  void recoverAllocatedPageTest() {
 #ifndef WIN32
     LocalDatabase *db = (LocalDatabase *)m_db;
     g_CHANGESET_POST_LOG_HOOK = (hook_func_t)copyLog;
@@ -567,6 +554,10 @@ struct LogHighLevelFixture {
       page->get_payload()[i] = (ham_u8_t)i;
     m_lenv->get_changeset().flush(1);
     m_lenv->get_changeset().clear();
+
+    /* don't store the PageManager's state - it would overwrite the log */
+    m_lenv->get_page_manager()->m_needs_flush = false;
+
     teardown();
 
     /* restore the backupped logfiles */
@@ -618,6 +609,10 @@ struct LogHighLevelFixture {
     }
     m_lenv->get_changeset().flush(33);
     m_lenv->get_changeset().clear();
+
+    /* don't store the PageManager's state - it would overwrite the log */
+    m_lenv->get_page_manager()->m_needs_flush = false;
+
     teardown();
 
     /* restore the backupped logfiles */
@@ -671,6 +666,10 @@ struct LogHighLevelFixture {
       page->get_payload()[i] = (ham_u8_t)i;
     m_lenv->get_changeset().flush(2);
     m_lenv->get_changeset().clear();
+
+    /* don't store the PageManager's state - it would overwrite the log */
+    m_lenv->get_page_manager()->m_needs_flush = false;
+
     teardown();
 
     /* restore the backupped logfiles */
@@ -721,6 +720,10 @@ struct LogHighLevelFixture {
     }
     m_lenv->get_changeset().flush(5);
     m_lenv->get_changeset().clear();
+
+    /* don't store the PageManager's state - it would overwrite the log */
+    m_lenv->get_page_manager()->m_needs_flush = false;
+
     teardown();
 
     /* restore the backupped logfiles */
@@ -778,6 +781,10 @@ struct LogHighLevelFixture {
     }
     m_lenv->get_changeset().flush(6);
     m_lenv->get_changeset().clear();
+
+    /* don't store the PageManager's state - it would overwrite the log */
+    m_lenv->get_page_manager()->m_needs_flush = false;
+
     teardown();
 
     /* restore the backupped logfiles */
@@ -883,10 +890,10 @@ TEST_CASE("Log-high/createCloseOpenFullLogEnvRecoverTest", "")
   f.createCloseOpenFullLogEnvRecoverTest();
 }
 
-TEST_CASE("Log-high/recoverAllocatePageTest", "")
+TEST_CASE("Log-high/recoverAllocatedPageTest", "")
 {
   LogHighLevelFixture f;
-  f.recoverAllocatePageTest();
+  f.recoverAllocatedPageTest();
 }
 
 TEST_CASE("Log-high/recoverAllocateMultiplePageTest", "")
